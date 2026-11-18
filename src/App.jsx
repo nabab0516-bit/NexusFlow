@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  lazy,
+  Suspense,
+} from "react";
 import { useNodesState, useEdgesState } from "@xyflow/react";
 import "./App.css";
 
@@ -7,22 +13,48 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { Navbar } from "./components/Navbar/Navbar";
 import { TopProjectBanner } from "./components/TopProjectBanner";
 
-// Pages
-import { Login } from "./pages/Login/Login";
-import { Register } from "./pages/Register/Register";
-import { Dashboard } from "./pages/Dashboard/Dashboard";
-import { Devices } from "./pages/Devices/Devices";
-import { Telemetry } from "./pages/Telemetry/Telemetry";
-import { RuleBuilder } from "./pages/RuleBuilder/RuleBuilder";
-import { NodeConfiguration } from "./pages/NodeConfiguration/NodeConfiguration";
-import { GraphJSON } from "./pages/GraphJSON/GraphJSON";
-import { Execution } from "./pages/Execution/Execution";
-import { Alerts } from "./pages/Alerts/Alerts";
-import { AutomationRules } from "./pages/AutomationRules/AutomationRules";
-import { Settings } from "./pages/Settings/Settings";
-import { Admin } from "./pages/Admin/Admin";
+// Lazy-loaded Pages
+const Login = lazy(() =>
+  import("./pages/Login/Login").then((module) => ({ default: module.Login }))
+);
+const Register = lazy(() =>
+  import("./pages/Register/Register").then((module) => ({ default: module.Register }))
+);
+const Dashboard = lazy(() =>
+  import("./pages/Dashboard/Dashboard").then((module) => ({ default: module.Dashboard }))
+);
+const Devices = lazy(() =>
+  import("./pages/Devices/Devices").then((module) => ({ default: module.Devices }))
+);
+const Telemetry = lazy(() =>
+  import("./pages/Telemetry/Telemetry").then((module) => ({ default: module.Telemetry }))
+);
+const RuleBuilder = lazy(() =>
+  import("./pages/RuleBuilder/RuleBuilder").then((module) => ({ default: module.RuleBuilder }))
+);
+const NodeConfiguration = lazy(() =>
+  import("./pages/NodeConfiguration/NodeConfiguration").then((module) => ({ default: module.NodeConfiguration }))
+);
+const GraphJSON = lazy(() =>
+  import("./pages/GraphJSON/GraphJSON").then((module) => ({ default: module.GraphJSON }))
+);
+const Execution = lazy(() =>
+  import("./pages/Execution/Execution").then((module) => ({ default: module.Execution }))
+);
+const Alerts = lazy(() =>
+  import("./pages/Alerts/Alerts").then((module) => ({ default: module.Alerts }))
+);
+const AutomationRules = lazy(() =>
+  import("./pages/AutomationRules/AutomationRules").then((module) => ({ default: module.AutomationRules }))
+);
+const Settings = lazy(() =>
+  import("./pages/Settings/Settings").then((module) => ({ default: module.Settings }))
+);
+const Admin = lazy(() =>
+  import("./pages/Admin/Admin").then((module) => ({ default: module.Admin }))
+);
 
-// Services (Connected to Express & MongoDB backend)
+// Services
 import { deviceService, ruleService, alertService } from "./services/api";
 
 // Fallback Mock Data
@@ -34,10 +66,36 @@ import {
   INITIAL_REACT_FLOW_EDGES,
 } from "./data/mockData";
 
+// Loading fallback
+const PageLoader = () => (
+  <div
+    style={{
+      minHeight: "250px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#00D9FF",
+      fontSize: "14px",
+      fontWeight: 600,
+    }}
+    role="status"
+    aria-live="polite"
+  >
+    Loading NexusFlow...
+  </div>
+);
+
 export function App() {
   // Navigation & Authentication
-  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem("nexusflow-auth") === "true");
-  const [activePage, setActivePage] = useState(() => sessionStorage.getItem("nexusflow-auth") === "true" ? "dashboard" : "login");
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => sessionStorage.getItem("nexusflow-auth") === "true"
+  );
+  const [activePage, setActivePage] = useState(
+    () =>
+      sessionStorage.getItem("nexusflow-auth") === "true"
+        ? "dashboard"
+        : "login"
+  );
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -45,19 +103,28 @@ export function App() {
   const [devices, setDevices] = useState(INITIAL_DEVICES);
   const [alerts, setAlerts] = useState(INITIAL_ALERTS);
   const [rules, setRules] = useState(INITIAL_AUTOMATION_RULES);
-  const [selectedDeviceForTelemetry, setSelectedDeviceForTelemetry] = useState(null);
+  const [selectedDeviceForTelemetry, setSelectedDeviceForTelemetry] =
+    useState(null);
 
   // React Flow Nodes and Edges State
-  const [nodes, setNodes, onNodesChange] = useNodesState(INITIAL_REACT_FLOW_NODES);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(INITIAL_REACT_FLOW_EDGES);
-  const [selectedNode, setSelectedNode] = useState(INITIAL_REACT_FLOW_NODES[0]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(
+    INITIAL_REACT_FLOW_NODES
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    INITIAL_REACT_FLOW_EDGES
+  );
+  const [selectedNode, setSelectedNode] = useState(
+    INITIAL_REACT_FLOW_NODES[0]
+  );
 
-  // Restore the user's visual workflow locally so the frontend remains useful without a backend.
+  // Restore saved workflow
   useEffect(() => {
     try {
       const saved = localStorage.getItem("nexusflow-graph");
+
       if (saved) {
         const graph = JSON.parse(saved);
+
         if (Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
           setNodes(graph.nodes);
           setEdges(graph.edges);
@@ -69,30 +136,48 @@ export function App() {
     }
   }, [setNodes, setEdges]);
 
-  // Load optional persistent data from backend API on mount
+  // Load optional persistent data from backend API
   useEffect(() => {
     const fetchBackendData = async () => {
       try {
-        const [loadedDevices, loadedRules, loadedAlerts, savedGraph] = await Promise.all([
-          deviceService.getAll(),
-          ruleService.getAll(),
-          alertService.getAll(),
-          ruleService.getGraph("rule-1"),
-        ]);
+        const [loadedDevices, loadedRules, loadedAlerts, savedGraph] =
+          await Promise.all([
+            deviceService.getAll(),
+            ruleService.getAll(),
+            alertService.getAll(),
+            ruleService.getGraph("rule-1"),
+          ]);
 
-        if (loadedDevices && loadedDevices.length) setDevices(loadedDevices);
-        if (loadedRules && loadedRules.length) setRules(loadedRules);
-        if (loadedAlerts && loadedAlerts.length) setAlerts(loadedAlerts);
+        if (loadedDevices && loadedDevices.length) {
+          setDevices(loadedDevices);
+        }
 
-        // Load persisted graph DAG if available in storage/MongoDB
-        if (savedGraph && savedGraph.nodes && savedGraph.nodes.length) {
+        if (loadedRules && loadedRules.length) {
+          setRules(loadedRules);
+        }
+
+        if (loadedAlerts && loadedAlerts.length) {
+          setAlerts(loadedAlerts);
+        }
+
+        if (savedGraph?.nodes?.length) {
           setNodes(savedGraph.nodes);
-          if (savedGraph.edges) setEdges(savedGraph.edges);
+
+          if (savedGraph.edges) {
+            setEdges(savedGraph.edges);
+          }
+
           setSelectedNode(savedGraph.nodes[0]);
-          console.log("[NexusFlow] Persisted graph loaded successfully from backend storage.");
+
+          console.log(
+            "[NexusFlow] Persisted graph loaded successfully from backend storage."
+          );
         }
       } catch (err) {
-        console.warn("Backend sync note: operating with resilient client store", err.message);
+        console.warn(
+          "Backend sync note: operating with resilient client store",
+          err.message
+        );
       }
     };
 
@@ -111,21 +196,23 @@ export function App() {
   }, []);
 
   // Persistent Graph Save
-  const handleSaveGraph = useCallback(
-    async (graph) => {
-      console.log("[NexusFlow] Persisting graph DAG to backend:", graph);
-      try {
-        localStorage.setItem("nexusflow-graph", JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
-        await ruleService.saveGraph({
-          ruleId: "rule-1",
-          graph: { nodes: graph.nodes, edges: graph.edges },
-        });
-      } catch (e) {
-        console.warn("Graph save error:", e);
-      }
-    },
-    []
-  );
+  const handleSaveGraph = useCallback(async (graph) => {
+    console.log("[NexusFlow] Persisting graph DAG to backend:", graph);
+
+    try {
+      localStorage.setItem(
+        "nexusflow-graph",
+        JSON.stringify({ nodes: graph.nodes, edges: graph.edges })
+      );
+
+      await ruleService.saveGraph({
+        ruleId: "rule-1",
+        graph: { nodes: graph.nodes, edges: graph.edges },
+      });
+    } catch (error) {
+      console.warn("Graph save error:", error);
+    }
+  }, []);
 
   const handleRunGraph = useCallback(() => {
     setActivePage("liveExecution");
@@ -135,36 +222,38 @@ export function App() {
     setActivePage("graphJson");
   }, []);
 
-  const handleEditRuleInBuilder = useCallback((rule) => {
+  const handleEditRuleInBuilder = useCallback(() => {
     setActivePage("ruleBuilder");
   }, []);
 
-  // Protected pages are only rendered after the demo login/register flow.
-
-  // Auth Screen Renders
+  // Authentication screens
   if (activePage === "login" || (!isAuthenticated && activePage !== "register")) {
     return (
-      <Login
-        onLoginSuccess={() => {
-          sessionStorage.setItem("nexusflow-auth", "true");
-          setIsAuthenticated(true);
-          setActivePage("dashboard");
-        }}
-        onNavigateRegister={() => setActivePage("register")}
-      />
+      <Suspense fallback={<PageLoader />}>
+        <Login
+          onLoginSuccess={() => {
+            sessionStorage.setItem("nexusflow-auth", "true");
+            setIsAuthenticated(true);
+            setActivePage("dashboard");
+          }}
+          onNavigateRegister={() => setActivePage("register")}
+        />
+      </Suspense>
     );
   }
 
   if (activePage === "register") {
     return (
-      <Register
-        onRegisterSuccess={() => {
-          sessionStorage.setItem("nexusflow-auth", "true");
-          setIsAuthenticated(true);
-          setActivePage("dashboard");
-        }}
-        onNavigateLogin={() => setActivePage("login")}
-      />
+      <Suspense fallback={<PageLoader />}>
+        <Register
+          onRegisterSuccess={() => {
+            sessionStorage.setItem("nexusflow-auth", "true");
+            setIsAuthenticated(true);
+            setActivePage("dashboard");
+          }}
+          onNavigateLogin={() => setActivePage("login")}
+        />
+      </Suspense>
     );
   }
 
@@ -180,6 +269,7 @@ export function App() {
             setActivePage={setActivePage}
           />
         );
+
       case "devices":
         return (
           <Devices
@@ -188,12 +278,10 @@ export function App() {
             onSelectDeviceForTelemetry={handleSelectDeviceForTelemetry}
           />
         );
+
       case "telemetry":
-        return (
-          <Telemetry
-            selectedDevice={selectedDeviceForTelemetry}
-          />
-        );
+        return <Telemetry selectedDevice={selectedDeviceForTelemetry} />;
+
       case "ruleBuilder":
         return (
           <RuleBuilder
@@ -212,6 +300,7 @@ export function App() {
             setActivePage={setActivePage}
           />
         );
+
       case "nodeConfig":
         return (
           <NodeConfiguration
@@ -222,6 +311,7 @@ export function App() {
             onBackToBuilder={() => setActivePage("ruleBuilder")}
           />
         );
+
       case "graphJson":
         return (
           <GraphJSON
@@ -230,12 +320,14 @@ export function App() {
             onBackToBuilder={() => setActivePage("ruleBuilder")}
           />
         );
+
       case "liveExecution":
         return (
           <Execution
             onBackToBuilder={() => setActivePage("ruleBuilder")}
           />
         );
+
       case "automationRules":
         return (
           <AutomationRules
@@ -245,6 +337,7 @@ export function App() {
             onEditRuleInBuilder={handleEditRuleInBuilder}
           />
         );
+
       case "alerts":
         return (
           <Alerts
@@ -253,16 +346,13 @@ export function App() {
             setActivePage={setActivePage}
           />
         );
+
       case "admin":
-        return (
-          <Admin
-            setActivePage={setActivePage}
-          />
-        );
+        return <Admin setActivePage={setActivePage} />;
+
       case "settings":
-        return (
-          <Settings />
-        );
+        return <Settings />;
+
       default:
         return (
           <Dashboard
@@ -275,11 +365,10 @@ export function App() {
     }
   };
 
-  const unreadAlerts = alerts.filter((a) => !a.read).length;
+  const unreadAlerts = alerts.filter((alert) => !alert.read).length;
 
   return (
     <div className="app-container">
-      {/* Persistent Left Sidebar */}
       <Sidebar
         activePage={activePage}
         setActivePage={setActivePage}
@@ -293,12 +382,9 @@ export function App() {
         }}
       />
 
-      {/* Main Content Layout */}
       <div className="main-content-layout">
-        {/* Top Reference Design Banner */}
         <TopProjectBanner />
 
-        {/* Top Navbar */}
         <Navbar
           activePage={activePage}
           setActivePage={setActivePage}
@@ -308,9 +394,10 @@ export function App() {
           setSearchQuery={setSearchQuery}
         />
 
-        {/* Dynamic Page Content */}
         <main className="page-content-wrapper">
-          {renderCurrentPage()}
+          <Suspense fallback={<PageLoader />}>
+            {renderCurrentPage()}
+          </Suspense>
         </main>
       </div>
     </div>
