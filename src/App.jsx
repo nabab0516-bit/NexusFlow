@@ -12,6 +12,7 @@ import "./App.css";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { Navbar } from "./components/Navbar/Navbar";
 import { TopProjectBanner } from "./components/TopProjectBanner";
+import { LoadingSpinner } from "./components/LoadingSpinner/LoadingSpinner";
 
 // Lazy-loaded Pages
 const Login = lazy(() =>
@@ -68,21 +69,7 @@ import {
 
 // Loading fallback
 const PageLoader = () => (
-  <div
-    style={{
-      minHeight: "250px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: "#00D9FF",
-      fontSize: "14px",
-      fontWeight: 600,
-    }}
-    role="status"
-    aria-live="polite"
-  >
-    Loading NexusFlow...
-  </div>
+  <LoadingSpinner message="Loading NexusFlow..." size={40} />
 );
 
 export function App() {

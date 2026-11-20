@@ -373,3 +373,13 @@ body {
   box-shadow: 0 0 25px rgba(255, 71, 87, 0.8) !important;
   border-color: #FF4757 !important;
 }
+
+/* NexusFlow Loading Spinner Animation */
+@keyframes nexus-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
